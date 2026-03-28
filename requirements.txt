@@ -1,0 +1,9 @@
+mistralai
+pandas
+numpy
+matplotlib
+seaborn
+scipy
+datasets
+tqdm
+python-dotenv
