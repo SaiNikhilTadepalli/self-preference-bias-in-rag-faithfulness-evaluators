@@ -9,7 +9,8 @@ This project investigates whether *self-preference bias*, the tendency of models
 The project aims to:
 * measure the strength of this bias
 * test whether knowledge of the response's author influences judgements
-* proposes a potential mitigation strategy based on paraphrasing
+* propose a potential mitigation strategy based on paraphrasing
+* establish whether the bias reflects genuine quality differences or stylistic preference, using controlled corruption
 
 ## Motivation
 If a model acting as a "judge" consistently rates outputs from its own model family more favourably, it may:
@@ -47,7 +48,20 @@ Experiments were performed on a subset of the [BioASQ Mini RAG dataset](https://
 All generation and evaluation was performed using `mistral-small-latest` via the Mistral API, chosen for its more than generous free tier. 
 
 ### Experimental design
-Five experiments were run on each QA pair. Every pairwise experiment uses *position debiasing*, where each comparison is run twice with the ordering of human and AI-generated answer flipped. This is to control LLM bias towards the first answer it sees. 
+Six experiments were run on each QA pair. Every pairwise experiment uses *position debiasing*, where each comparison is run twice with the ordering of human and AI-generated answer flipped. This is to control LLM bias towards the first answer it sees. 
+
+| Experiment | Description |
+|---|---|
+| **Exp 1** | Blind pairwise — no authorship information shown. Establishes raw baseline bias. |
+| **Exp 2** | Correct labels — answers labelled `[Human-Authored]` and `[AI-Generated]`. |
+| **Exp 3** | Flipped labels — labels are deliberately swapped to test label anchoring. |
+| **Exp 4** | Individual scoring — each answer scored independently on a 0–1 faithfulness ratio. Measures absolute score inflation rather than relative preference. |
+| **Exp 5a** | Paraphrase LLM only — the LLM answer is aggressively rewritten before evaluation to disrupt its stylometric fingerprint. Human answer unchanged. |
+| **Exp 5b** | Paraphrase both — both answers paraphrased, controlling for the rewriting process itself. |
+| **Exp 6a** | Controlled corruption (LLM) — a single subtle factual error is injected into the LLM answer. Tests whether the evaluator correctly penalises a corrupted LLM answer over the intact human answer. |
+| **Exp 6b** | Controlled corruption (Human) — the same procedure applied to the human answer. An unbiased evaluator should perform similarly on 6a and 6b; asymmetry reveals bias. |
+
+Corruptions in Exps 6a/6b target specific, verifiable scalar claims, e.g., numerical values, named entities, or causal relationships and are kept surface-preserving so that only the factual content changes, not the style.
 
 > For a more comprehensive walkthrough of the methodology, including prior hypotheses, each of the experiments in greater detail and the statistical tests performed, see `experiments.ipynb`.
 
@@ -123,16 +137,25 @@ Paraphrasing the LLM answer before evaluation appears to be a viable debiasing s
 * The bias was highly inconsistent across individual QA pairs, with no obvious clustering by question index. This suggests self-preference bias is not evenly distributed, i.e. some questions systematically elicit it, others do not.
 * The individual LLM row is almost uniformly dark green, i.e. the evaluator awards near-perfect scores to LLM answers across virtually all pairs.
 
+### Figure 7: Controlled corruption
+
+![Figure 7: Controlled corruption](figures/corrupted_answers.png)
+
+* When the LLM answer is corrupted, the evaluator correctly prefers the more faithful human answer only 26.1% of the time, much below the 50% chance baseline.
+* When the human answer is corrupted instead, the evaluator correctly prefers the more faithful LLM answer 67% of the time.
+* This ~41% percentage point gap between Exp 6a and 6b cannot be explained by answer quality. Panel B shows that corruption type distributions are nearly identical across LLM and human answers, which rules out the possibility that LLM answers simply received harder-to-detect errors. The only systematic difference is which answer is stylistically LLM-like, and the evaluator consistently protects that answer even when it is factually wrong, and therefore less faithful.
+
 ## Key conclusions
    1) Self-preference bias is real and substantial in blind conditions (i.e. where there is no prior knowledge of the author of the responses).
    2) Labelling makes things worse under adversarial conditions. Providing correct authorship labels barely changes the bias. Providing incorrect labels makes the bias significantly worse, implying the evaluator is using labels to confirm, rather than correct, its prior.
    3) Score inflation is present in non-comparative evaluations. Production pipelines using LLM-as-a-judge without comparative controls are likely overestimating faithfulness.
    4) Paraphrasing the LLM answer is an effective mitigation, with caveats. The debiasing benefit of paraphrasing likely depends on using a *different* model family as the paraphraser to avoid re-introducing familiar stylistic patterns.
    5) Bias is not uniform, with high variance across questions. Aggregate evaluations may mask that for a meaningful subset of queries, the evaluator is unbiased or even reversed, while for others the preference is extreme.
+   6) The bias is not explained by genuine quality differences. The controlled corruption experiment revealed that stylistic preference demonstrably overrides factual signal.
 
 ## Limitations and further work
 * **Verbosity bias:** LLM judges are known to exhibit *verbosity bias*, the tendency to rate longer, more detailed responses more favourably even if a shorter response is more concise, helpful and correct. A qualitative visual inspection suggested that the AI-generated and the human-written answers were of comparable length, however a follow-up study should implement a length normalisation procedure to ensure the preference is truly stylistic rather than a bi-product of token count.
-* **Model family:** All experiments used `mistral-small-latest` for both generation and evaluation. Exp 5a suggests that the bias is due to surface-level stylometric patterns. However, it is unclear if Mistral recognises its own probabilistic "fingerprint" or merely its formatting preferences. Testing across a model family gradient (e.g., using Mistral Large to judge Mistral Small) or even across different model providers would help determine if this self-preference is a result of general LLM-to-LLM bias or specific fine-tuning. This would be a highly tractable next experiment.
+* **Single model family:** All experiments used `mistral-small-latest` for both generation and evaluation. This makes it impossible to distinguish between "Mistral specifically prefers its own outputs" from "all LLMs prefer any LLM output over human output". These two hypotheses have very different implications for scalable oversight. The former suggests cross-provider evaluation panels as a fix, whilst the latter implies the problem is structural and no current LLM judge is 100% trustworthy for this task without intervention. Cross-model testing was not completed due to time constraints and API credit limits. Whether LLM-to-LLM preference is a general property of language models or specific to model-families is therefore a highly tractable and important next experiment to perform.
 * **Linguistic homogeneity:** The BioASQ dataset is highly technical and formulaic in nature. The linguistic "search space" for such answers is narrow, which might make the LLM's stylistic signature more obvious than it would be in creative writing for example. In other words, both the human ground truth and the LLM output have to use the same rigid terminology, so the model's latent stylistic signatures likely "stand out" more clearly to the evaluator.
 * **Chain-of-Thought (CoT) evaluation:** Exploring Chain-of-Thought (CoT) was a suggested improved debiasing mechanism, but was not pursued due to high token costs and time constraints. A promising next step would be implementing some form of structured claim-extraction pipeline using CoT where the model must extract $N$ claims from the source and $N$ claims from the answer before comparing.
 
