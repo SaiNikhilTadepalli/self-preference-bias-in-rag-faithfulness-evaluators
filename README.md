@@ -65,6 +65,12 @@ Corruptions in Exps 6a/6b target specific, verifiable scalar claims, e.g., numer
 
 > For a more comprehensive walkthrough of the methodology, including prior hypotheses, each of the experiments in greater detail and the statistical tests performed, see `experiments.ipynb`.
 
+### Sample size and statistical significance
+All experiments were conducted on a subset of $N=80$ randomly sampled QA pairs from the BioASQ dataset.
+
+* This sample size was chosen as a balance between computational cost and statistical power, given that this project was conducted as a "proof-of-concept" research sprint under strict time conditions. 
+* Future work should scale to $N>500$ across multiple datasets to confirm if these bias percentages hold steady or regress toward the mean in more diverse linguistic environments.
+
 ## Getting started
 The experiments are designed to be reproducible with minimal setup. `experiments.ipynb` contains all of the code for preparing the data, running the experiments and generating the figures.
 
@@ -104,7 +110,7 @@ If you prefer to run the analysis on your local machine:
 
 ![Figure 2: Mean pairwise score with 95% bootstrap confidence interval](figures/mean_pairwise_score_with_ci.png)
 
-Exp 5a was the only condition in which the mean score crossed the zero line into positive territory, i.e., the only condition under which the evaluator is, on average, slightly more likely to prefer the human answer. The confidence intervals for Exp 5a and the baseline did not overlap, indicating this shift is statistically meaningful at the sample size used.
+Exp 5a was the only condition in which the mean score crossed the zero line into positive territory, i.e., the only condition under which the evaluator is, on average, slightly more likely to prefer the human answer. The 95% bootstrap confidence intervals for Exp 5a and the baseline did not overlap, indicating this shift is statistically meaningful at the sample size used. However, the width of the intervals across all experiments highlights the high "per-row" variance seen in Figure 6, suggesting that the model's "gut feeling" for its own style is strong but not perfectly consistent.
 
 ### Figure 3: Individual faithfulness scoring
 
@@ -154,6 +160,7 @@ Paraphrasing the LLM answer before evaluation appears to be a viable debiasing s
    6) The bias is not explained by genuine quality differences. The controlled corruption experiment revealed that stylistic preference demonstrably overrides factual signal.
 
 ## Limitations and further work
+* **Small-sample generalisability:** This project served as a "proof-of-concept" research sprint under strict time conditions rather than a full end-to-end research project. While the findings are statistically significant within the tested subset, the relatively small $N=80$ means the results should be viewed as an indicator of a systemic blind spot rather than perhaps a universal one.
 * **Verbosity bias:** LLM judges are known to exhibit *verbosity bias*, the tendency to rate longer, more detailed responses more favourably even if a shorter response is more concise, helpful and correct. A qualitative visual inspection suggested that the AI-generated and the human-written answers were of comparable length, however a follow-up study should implement a length normalisation procedure to ensure the preference is truly stylistic rather than a bi-product of token count.
 * **Single model family:** All experiments used `mistral-small-latest` for both generation and evaluation. This makes it impossible to distinguish between "Mistral specifically prefers its own outputs" from "all LLMs prefer any LLM output over human output". These two hypotheses have very different implications for scalable oversight. The former suggests cross-provider evaluation panels as a fix, whilst the latter implies the problem is structural and no current LLM judge is 100% trustworthy for this task without intervention. Cross-model testing was not completed due to time constraints and API credit limits. Whether LLM-to-LLM preference is a general property of language models or specific to model-families is therefore a highly tractable and important next experiment to perform.
 * **Linguistic homogeneity:** The BioASQ dataset is highly technical and formulaic in nature. The linguistic "search space" for such answers is narrow, which might make the LLM's stylistic signature more obvious than it would be in creative writing for example. In other words, both the human ground truth and the LLM output have to use the same rigid terminology, so the model's latent stylistic signatures likely "stand out" more clearly to the evaluator.
